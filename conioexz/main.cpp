@@ -1,10 +1,41 @@
 #include <cstdio>
 #include <chrono>
+//#define CONIOEX
 #include "conioexz.h"
 
+// コンソールウィンドウを指定サイズにリサイズする
+void resizeConsole(int cols, int rows) {
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (h == INVALID_HANDLE_VALUE) return;
+
+    // バッファを先に大きくしないとウィンドウを広げられない
+    COORD bufSize = { static_cast<SHORT>(cols), static_cast<SHORT>(rows) };
+    SetConsoleScreenBufferSize(h, bufSize);
+
+    SMALL_RECT winRect = { 0, 0,
+        static_cast<SHORT>(cols - 1),
+        static_cast<SHORT>(rows - 1)
+    };
+    SetConsoleWindowInfo(h, TRUE, &winRect);
+
+    // バッファをウィンドウぴったりに再設定（スクロールバーを消す）
+    SetConsoleScreenBufferSize(h, bufSize);
+}
+
 int main() {
+#ifdef CONIOEX
+    // CONIOEX モード: Keyboard + Mouse のみ表示
+    // rows: 11(keyboard) + 7(mouse) + 1(footer) = 19
+    resizeConsole(200, 50);
+#else
+    // 通常モード: Keyboard + Mouse + Gamepad 表示
+    // rows: 11(keyboard) + 7(mouse) + 16(gamepad) + 1(footer) = 35
+    resizeConsole(200, 50);
+#endif
+
     hideCursor(false);
     enableMouseInput(true);
+
     auto fps_s = std::chrono::milliseconds(1000 / 60);
     auto last = std::chrono::steady_clock::now();
 
@@ -37,15 +68,20 @@ int main() {
         // =====================================================================
         printf("=== Mouse ===\n");
         printf("POS    : x=%-5d y=%-5d    \n", import(PORT_MOUSE_X), import(PORT_MOUSE_Y));
+#ifndef CONIOEX
         printf("DELTA  : x=%-5d y=%-5d    \n", import(PORT_MOUSE_DX), import(PORT_MOUSE_DY));
+#else
+        printf("DELTA  : (COMPAT mode: N/A)    \n");
+#endif
         printf("LEFT   : %d    \n", import(VK_LBUTTON));
         printf("RIGHT  : %d    \n", import(VK_RBUTTON));
         printf("MIDDLE : %d    \n", import(VK_MBUTTON));
         printf("\n");
 
         // =====================================================================
-        //  ゲームパッド（未接続なら全部 0 になる）
+        //  ゲームパッド（通常モードのみ、未接続なら全部 0）
         // =====================================================================
+#ifndef CONIOEX
         const int pad = import(PORT_PAD_BUTTONS);
         printf("=== Gamepad ===\n");
         printf("A      : %d    \n", (pad & PAD_A) ? 1 : 0);
@@ -68,6 +104,7 @@ int main() {
         printf("RT     : %-3d    \n", import(PORT_PAD_RT));
         printf("PACKED : 0x%04X    \n", pad);
         printf("\n");
+#endif
 
         printf("ESC で終了    \n");
     }
